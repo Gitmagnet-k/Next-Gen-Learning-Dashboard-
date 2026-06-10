@@ -1,0 +1,59 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Check deployment secrets
+        id: check
+        run: |
+          if [ -n "${{ secrets.VERCEL_TOKEN }}" ]; then
+            echo "provider=vercel" >> $GITHUB_OUTPUT
+          elif [ -n "${{ secrets.NETLIFY_AUTH_TOKEN }}" ]; then
+            echo "provider=netlify" >> $GITHUB_OUTPUT
+          else
+            echo "No deployment secrets found. Skipping deploy.";
+            echo "provider=none" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deploy to Vercel
+        if: steps.check.outputs.provider == 'vercel'
+        uses: amondnet/vercel-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-args: '--prod'
+          working-directory: './'
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Deploy to Netlify
+        if: steps.check.outputs.provider == 'netlify'
+        uses: netlify/actions/cli@v3
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+        with:
+          args: deploy --dir=.next --prod --site=${{ secrets.NETLIFY_SITE_ID }}
+
+      - name: Report no deploy
+        if: steps.check.outputs.provider == 'none'
+        run: echo "No deployment performed; set VERCEL_TOKEN or NETLIFY_AUTH_TOKEN in repository secrets to enable automatic deploys."
