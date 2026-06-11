@@ -7,7 +7,8 @@ import type { Course } from "@/types/course";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export default async function Home() {
-  const res = await (supabase as SupabaseClient).from<Course>("Courses").select("*");
+  const raw = await (supabase as SupabaseClient<any, any, any, any>).from("Courses").select("*");
+  const res = raw as { data: Course[] | null; error: { message?: string } | null };
   const courses: Course[] | null = res?.data ?? null;
 
   const error = res?.error ?? null;
